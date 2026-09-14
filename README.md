@@ -158,7 +158,7 @@ The pipeline fails explicitly when an invalid or inconsistent condition is detec
 - `log_task_failure` is configured as the failure callback for the weather DAG and records a structured `WEATHER_TASK_FAILURE` message containing the DAG, task, run, and exception details.
 - `test_failure` is an intentionally failing DAG used to verify retries and callback behaviour without altering the production weather DAG.
 
-The callback currently writes structured failure information to the Airflow task logs. External email or Slack notifications are intentionally outside the scope of this learning project.
+The `on_failure_callback` mechanism is implemented and verified: when a task fails, Airflow invokes `log_task_failure`, which writes structured failure details to the task logs. The integration with an external alerting service is intentionally conceptual and outside the scope of this local learning project. No email, Slack message, webhook, or other external notification is configured or triggered.
 
 ## Automated tests
 
