@@ -32,9 +32,33 @@ Files are shared through local bind mounts. XCom passes file paths and row count
 
 Development and verification were performed on Windows with PowerShell, VS Code and Docker Desktop using WSL 2. PostgreSQL and Redis tags track their respective release lines; they are not image-digest pins.
 
+## Prerequisites
+
+### Foundational knowledge
+
+- Basic terminal use: open PowerShell, navigate between folders with `cd`, run commands, and read output and error messages.
+- Basic Python: variables, functions, imports, collections, and exceptions.
+- Basic SQL: SELECT, INSERT, primary keys, and the purpose of transactions.
+- Familiarity with JSON, CSV, and the extract-transform-load workflow.
+- Basic Git concepts: clone, stage, commit, and push. Staging and committing can also be performed through VS Code's Source Control interface.
+
+Prior Airflow experience is not required: orchestration, task dependencies, scheduling, and retries are learning objectives of this project.
+
+### Software and resources
+
+- Git.
+- Docker Desktop running Linux containers through WSL 2.
+- Python 3.13 for local tests and the setup key-generation command.
+- PowerShell; VS Code is the editor used during development.
+- Internet access to download images and packages and request Open-Meteo forecasts.
+
+The Compose initialization checks for at least 4 GB of Docker memory and recommends at least 2 CPUs and 10 GB of disk space.
+
 ## Setup on Windows
 
-Prerequisites: Git, Docker Desktop running Linux containers through WSL 2, and Python 3.13 for local tests. The Compose initialization checks for at least 4 GB of Docker memory and recommends at least 2 CPUs and 10 GB of disk space.
+Run the commands below in PowerShell. After cloning, use the repository root (the folder containing `docker-compose.yaml`) as the working directory unless stated otherwise.
+
+Python code for the Airflow tasks runs inside Docker; the local `.venv` is used for automated tests.
 
 ### 1. Clone and configure
 
