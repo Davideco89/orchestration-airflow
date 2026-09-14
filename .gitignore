@@ -1,0 +1,30 @@
+# Python environment and cache
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Generated data and Airflow logs
+/data/
+/logs/
+*.duckdb
+*.duckdb.wal
+
+# Exploratory notebooks
+/notebooks/
+
+# Test and coverage cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Local Airflow configuration
+/config/airflow.cfg
