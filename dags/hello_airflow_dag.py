@@ -15,7 +15,7 @@ with DAG(
     dag_id="hello_airflow",
     description="First workflow with Bash and Python tasks",
     start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
-    schedule=None,
+    schedule="*/5 * * * *",
     catchup=False,
     tags=["learning"],
 ) as dag:

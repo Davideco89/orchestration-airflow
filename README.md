@@ -15,6 +15,13 @@ The `weather_etl` DAG runs four tasks in sequence:
 | `load` | Insert or update forecasts in a transaction | DuckDB `weather_hourly` table |
 | `validate` | Reconcile each CSV row with the database | Validated row count or an exception |
 
+```mermaid
+flowchart LR
+    A["Extract<br/>Open-Meteo JSON"] --> B["Transform<br/>Validated CSV"]
+    B --> C["Load<br/>DuckDB upsert"]
+    C --> D["Validate<br/>CSV vs DuckDB"]
+```
+
 Airflow uses CeleryExecutor, Redis as its broker, and PostgreSQL for orchestration metadata. DuckDB is a separate database containing the weather data.
 
 Files are shared through local bind mounts. XCom passes file paths and row counts rather than entire datasets. Each DAG run has its own directory under `data/runs/`.
@@ -38,7 +45,7 @@ Development and verification were performed on Windows with PowerShell, VS Code 
 
 - Basic terminal use: open PowerShell, navigate between folders with `cd`, run commands, and read output and error messages.
 - Basic Python: variables, functions, imports, collections, and exceptions.
-- Basic SQL: SELECT, INSERT, primary keys, and the purpose of transactions.
+- Basic SQL: `SELECT`, `INSERT`, primary keys, and the purpose of transactions.
 - Familiarity with JSON, CSV, and the extract-transform-load workflow.
 - Basic Git concepts: clone, stage, commit, and push. Staging and committing can also be performed through VS Code's Source Control interface.
 
@@ -61,8 +68,6 @@ Run the commands below in PowerShell. After cloning, use the repository root (th
 Python code for the Airflow tasks runs inside Docker; the local `.venv` is used for automated tests.
 
 ### 1. Clone and configure
-
-Run these commands in PowerShell:
 
 ```powershell
 git clone https://github.com/Davideco89/orchestration-airflow.git
@@ -114,10 +119,11 @@ The validation log reports the number of CSV rows reconciled against DuckDB. A s
 
 ## Scheduling and data semantics
 
-- Schedule: `0 */6 * * *`, every six hours in UTC.
+- Introductory DAG: `hello_airflow` runs every five minutes with `*/5 * * * *`.
+- Weather DAG: `weather_etl` runs every six hours in UTC with `0 */6 * * *`.
 - `catchup=False`; this project does not implement historical backfills.
 - `max_active_runs=1` prevents overlapping runs of the weather DAG.
-- Each task has two retries with a 30-second delay: up to three attempts.
+- Each weather task has two retries with a 30-second delay: up to three attempts.
 - The request uses `forecast_days=1` and `timezone=UTC`.
 
 Each extraction requests forecasts for the current UTC calendar day at execution time. The data is forecast output, not measured observations. Re-running an older logical run later does not retrieve forecasts for that older interval.
@@ -139,6 +145,20 @@ Transformation checks:
 All input rows are validated before writing the CSV. Loading uses an explicit transaction and `ON CONFLICT DO UPDATE`; a failed batch is rolled back.
 
 Post-load validation checks that every CSV key exists and its three values match with relative and absolute tolerances of `1e-9`. It does not require the entire warehouse to have the same row count as the current CSV, and does not independently verify forecast accuracy.
+
+## Error handling and observability
+
+The pipeline fails explicitly when an invalid or inconsistent condition is detected:
+
+- `extract` propagates HTTP and network errors instead of producing incomplete data.
+- `transform` rejects unexpected units, invalid timestamps, duplicate timestamps, non-finite values, humidity outside `0–100`, negative precipitation, and empty datasets.
+- `load` runs inside a DuckDB transaction and executes `ROLLBACK` if an error occurs.
+- `validate` raises an error when a CSV row is missing from DuckDB or when stored values do not match the transformed source.
+- Airflow retries failed weather tasks twice, with a 30-second delay between attempts.
+- `log_task_failure` is configured as the failure callback for the weather DAG and records a structured `WEATHER_TASK_FAILURE` message containing the DAG, task, run, and exception details.
+- `test_failure` is an intentionally failing DAG used to verify retries and callback behaviour without altering the production weather DAG.
+
+The callback currently writes structured failure information to the Airflow task logs. External email or Slack notifications are intentionally outside the scope of this learning project.
 
 ## Automated tests
 
@@ -163,12 +183,33 @@ Tests create and clean up temporary files and databases. They do not call the AP
 
 Additional manual checks completed during development:
 
-- `hello_airflow` completed its Bash and Python tasks.
-- `weather_etl` completed manual and scheduled runs; the added `validate` task subsequently completed in a manual run.
+- `hello_airflow` completed its Bash and Python tasks and was configured to run every five minutes.
+- `weather_etl` completed both manual and scheduled runs with `extract`, `transform`, `load`, and `validate` successful.
 - `test_failure` made three attempts and ended in the expected Failed state.
-- The failure callback emitted `WEATHER_TASK_FAILURE` with DAG, task, run and exception details.
+- The failure callback emitted `WEATHER_TASK_FAILURE` with DAG, task, run, and exception details.
+- The DAG processor reported no import errors.
 
-The callback writes an error log; external email or Slack notifications are not configured. The `test_failure` DAG is an intentional manual failure test and should not be interpreted as a pipeline defect.
+The DAG import check can be repeated with:
+
+```powershell
+docker compose exec airflow-dag-processor airflow dags list-import-errors
+```
+
+A healthy result is `No data found`, meaning that no DAG import errors were recorded.
+
+## Airflow execution evidence
+
+### Successful task executions
+
+The Airflow UI shows successful executions of all four pipeline tasks: `extract`, `transform`, `load`, and `validate`.
+
+![Successful weather ETL tasks](docs/images/weather_etl_success.png)
+
+### Manual and scheduled runs
+
+The DAG completed successfully through both manual triggers and its six-hour UTC schedule.
+
+![Successful manual and scheduled DAG runs](docs/images/weather_etl_runs.png)
 
 ## Repository contents
 
@@ -177,12 +218,14 @@ The callback writes an error log; external email or Slack notifications are not 
 | `dags/` | Weather pipeline, introductory DAG and intentional failure DAG |
 | `src/` | Extraction, transformation, loading, reconciliation and callback functions |
 | `tests/` | Reproducible local tests |
+| `docs/images/` | Airflow UI evidence for task execution and DAG runs |
 | `Dockerfile` | Extend the Airflow image with DuckDB |
 | `docker-compose.yaml` | Local orchestration stack and shared mounts |
 | `requirements.txt` | Additional Python dependency pin |
 | `.env.example` | Configuration template without a Fernet key |
 | `.gitignore` | Exclude local secrets, data, logs, environment and exploratory notebooks |
 | `.dockerignore` | Exclude local artifacts from the image build context |
+| `LICENSE` | Apache License 2.0 for this repository |
 
 Generated warehouse: `data/weather.duckdb` on the host, mounted at `/opt/airflow/data/weather.duckdb` in the containers. Local `config/airflow.cfg` is generated during initialization and is not committed.
 

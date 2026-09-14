@@ -29,6 +29,7 @@ with DAG(
     default_args={
         "retries": 2,
         "retry_delay": timedelta(seconds=30),
+        "on_failure_callback": log_task_failure,
     },
     tags=["learning", "weather"],
 ) as dag:
